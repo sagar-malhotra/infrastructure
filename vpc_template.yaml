@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Assignment 3 VPC     
+Parameters:
+  paramPublicSubnet1CIDR:
+    Description: IP range for the public subnet in AZ 1
+    Type: String
+    Default: 10.192.10.0/24
+  paramPublicSubnet2CIDR:
+    Description: IP range for the public subnet in AZ 2
+    Type: String
+    Default: 10.192.11.0/24
+  paramPublicSubnet3CIDR:
+    Description: IP range for the public subnet in AZ 3
+    Type: String
+    Default: 10.192.12.0/24
+  paramVpcCIDR:
+    Description:  IP range (CIDR notation) for VPC
+    Type: String
+    Default: 10.192.0.0/16
+Resources:
+
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref paramVpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value:  !Ref AWS::StackName
+
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join [ "_", [ "InternetGateway", !Ref AWS::StackName ] ]
+
+  myVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref myVPC
+      InternetGatewayId: !Ref myInternetGateway
+
+  myPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value:  !Join [ "_", ["Route_Table", !Ref AWS::StackName ] ]
+
+  myPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: myVPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref myPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref myInternetGateway
+
+  myPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myVPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ] # AZ 1
+      CidrBlock: !Ref paramPublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "_", ["Subnet1", !Ref AWS::StackName ] ]
+ 
+  myPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myVPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ] # AZ 2
+      CidrBlock: !Ref paramPublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "_", ["Subnet2", !Ref AWS::StackName ] ]
+ 
+  myPublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myVPC
+      AvailabilityZone: !Select [ 2, !GetAZs  '' ] # AZ 3
+      CidrBlock: !Ref paramPublicSubnet3CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "_", ["Subnet3", !Ref AWS::StackName ] ]
+
+  mySubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref myPublicRouteTable
+      SubnetId: !Ref myPublicSubnet1
+
+  mySubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref myPublicRouteTable
+      SubnetId: !Ref myPublicSubnet2
+
+  mySubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref myPublicRouteTable
+      SubnetId: !Ref myPublicSubnet3
