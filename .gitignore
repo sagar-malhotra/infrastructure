@@ -1,0 +1,4 @@
+# Visual Studio
+*.e2e
+# Visual Studio cache/options directory
+.vs/
