@@ -34,11 +34,11 @@ Add output type
 
 # Setting up Infrastructure using the Cloud Formation template
 
-aws cloudformation create-stack --stack-name <name of the stack you want to create> --template-body file://vpc_template.yaml --profile <Profile you want to create stack with>
+aws cloudformation create-stack --stack-name (name of the stack you want to create) --template-body file://vpc_template.yaml --profile (Profile you want to create stack with)
   
 # Cleaning up the infrastructure
   
-aws cloudformation delete-stack --stack-name <name of the stack you want to delete> --profile <Profile you want to delete stack with>
+aws cloudformation delete-stack --stack-name (name of the stack you want to delete) --profile (Profile you want to delete stack with)
   
 
 
