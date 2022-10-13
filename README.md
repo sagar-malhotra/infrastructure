@@ -10,35 +10,35 @@
 
 For Dev account
 
-Runn command : aws configure --profile=dev
+Run command : aws configure --profile=dev
 
-Add account id
+Add account id:
 
-Add secret key
+Add secret key:
 
-Add region
+Add region:
 
-Add output type
+Add output type:
 
 For Demo/Prod account
 
-Runn command : aws configure --profile=prod
+Run command : aws configure --profile=prod
 
-Add account id
+Add account id:
 
-Add secret key
+Add secret key:
 
-Add region
+Add region:
 
-Add output type
+Add output type:
 
 # Setting up Infrastructure using the Cloud Formation template
 
-aws cloudformation create-stack --stack-name (name of the stack you want to create) --template-body file://vpc_template.yaml --profile (Profile you want to create stack with)
+aws cloudformation create-stack --stack-name (name of the stack you want to create) --template-body file://vpc_template.yaml --profile (Profile you want to create stack with) --region (region name)
   
 # Cleaning up the infrastructure
   
-aws cloudformation delete-stack --stack-name (name of the stack you want to delete) --profile (Profile you want to delete stack with)
+aws cloudformation delete-stack --stack-name (name of the stack you want to delete) --profile (Profile you want to delete stack with) --region (region name)
   
 
 
