@@ -12,29 +12,14 @@ For Dev account
 
 Run command : aws configure --profile=dev
 
-Add account id:
-
-Add secret key:
-
-Add region:
-
-Add output type:
-
 For Demo/Prod account
 
 Run command : aws configure --profile=prod
 
-Add account id:
-
-Add secret key:
-
-Add region:
-
-Add output type:
 
 # Setting up Infrastructure using the Cloud Formation template
 
-aws cloudformation create-stack --stack-name (name of the stack you want to create) --template-body file://vpc_template.yaml --profile (Profile you want to create stack with) --region (region name)
+aws cloudformation create-stack --stack-name assignment6 --template-body file://infrastructure.yaml --parameters ParameterKey=amiId,ParameterValue=ami-03bfd684634fdd769 ParameterKey=HostedZoneName,ParameterValue=prod.sagarmalhotra.me. --region us-east-1 --profile demo --capabilities CAPABILITY_NAMED_IAM
   
 # Cleaning up the infrastructure
   
