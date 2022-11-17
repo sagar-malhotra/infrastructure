@@ -224,14 +224,6 @@ Resources:
           Value: !Join [ "_", [ "PrivateRouteTable", !Ref AWS::StackName ] ]
 
 
-#d) Associate the private route table with the Nat Gateway in AZ 1
-  # myPrivateRoute:
-  #   Type: AWS::EC2::Route
-  #   Properties:
-  #     RouteTableId: !Ref myPrivateRouteTable
-  #     DestinationCidrBlock: ${EC2Instance.PublicIp}
-  #     GatewayId: !Ref InternetGateway 
-### check gateway or interna gateway for private route
   myPrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -294,14 +286,7 @@ Resources:
         - Key: Name
           Value: !Join [ "_", [ "DatabaseSecurityGroup", !Ref AWS::StackName ] ]
       VpcId: !Ref VPC
-        # - IpProtocol: tcp
-        #   FromPort: 3306
-        #   ToPort: 3306
-        #   CidrIp: 10.0.1.0/24
-        #   #SourceSecurityGroupId: !Ref SecurityGroup
 
-
-# check s3 non empty delete=================================
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties: 
@@ -309,7 +294,7 @@ Resources:
         ServerSideEncryptionConfiguration: 
         - ServerSideEncryptionByDefault:
             SSEAlgorithm: AES256
-      BucketName: !Join [ "", [ "prods3bucket", !Ref AWS::StackName ] ]
+      BucketName: !Join [ "", [ "prods3bucketsagar", !Ref AWS::StackName ] ]
       LifecycleConfiguration:
         Rules:
           - Id: S3Lifecycle
@@ -320,7 +305,7 @@ Resources:
             ExpirationInDays: 365
       Tags:
         - Key: Name
-          Value: !Join [ "", [ "prods3bucket", !Ref AWS::StackName ] ]
+          Value: !Join [ "", [ "prods3bucketsagar", !Ref AWS::StackName ] ]
 
   RDSDBParameterGroup:
     Type: 'AWS::RDS::DBParameterGroup'
@@ -391,13 +376,14 @@ Resources:
           - Effect: "Allow"
             Action:
               - "dynamodb:PutItem"
-              - "dynamodb:DeleteItem"
               - "dynamodb:GetItem"
-              - "dynamodb:Scan"
-              - "dynamodb:Query"
-              - "dynamodb:UpdateItem"
             Resource: 
               - !GetAtt DynamoDBTable.Arn
+          - Effect: "Allow"
+            Action:
+              - "sns:Publish"
+            Resource: 
+              - "arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment8"
 
   
   EC2CSYE6225:
@@ -440,11 +426,9 @@ Resources:
     Properties:
       Subscription:
         - Endpoint:
-            Fn::GetAtt:
-              - "MyLambdaFunction"
-              - "Arn"
-          Protocol: "lambda"
-      TopicName: "CSYETopic"
+            !GetAtt MyLambdaFnc.Arn
+          Protocol: lambda
+      TopicName: !Join [ "_", ["CSYETopic", !Ref AWS::StackName ] ]
 
   SESLambda:
     Type: 'AWS::IAM::ManagedPolicy'
@@ -455,26 +439,8 @@ Resources:
           - Effect: "Allow"
             Action:
               - "ses:SendEmail"
-              - "ses:SendRawEmail"
             Resource: 
               - "arn:aws:ses:us-east-1:868454036435:identity/prod.sagarmalhotra.me"
-          - Effect: "Allow"
-            Action:
-              - "logs:CreateLogGroup"
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: 
-              - "arn:aws:ses:us-east-1:*:*"
-          - Effect: "Allow"
-            Action:
-              - "dynamodb:PutItem"
-              - "dynamodb:DeleteItem"
-              - "dynamodb:GetItem"
-              - "dynamodb:Scan"
-              - "dynamodb:Query"
-              - "dynamodb:UpdateItem"
-            Resource: 
-              - !GetAtt DynamoDBTable.Arn
           - Effect: "Allow"
             Action:
               - "s3:GetObject"
@@ -494,15 +460,22 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns: 
         - !Ref SESLambda
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       RoleName: !Join [ "_", ["SESRole", !Ref AWS::StackName ] ]
 
-  MyLambdaFunction:
+  MyLambdaFnc:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: MyLambdaFunction
+      FunctionName: "MyLambdaFnc"
       Role: !GetAtt SESRole.Arn
       Runtime: python3.8
-      Handler: index.my_handler
+      Handler: lambda_function.lambda_handler
+      # Events:
+      #   SNS1:
+      #     Type: SNS
+      #     Properties:
+      #       Topic:
+      #         Ref: MySNSTopic
       Code:
         S3Bucket: "lbsagar"
         S3Key: "lambda_function.zip"
@@ -531,6 +504,15 @@ Resources:
         TimeToLiveSpecification:
           AttributeName: "TTL"
           Enabled: "True"
+
+  LambdaFunctionPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:InvokeFunction
+        FunctionName: !GetAtt MyLambdaFnc.Arn
+        SourceArn: arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment8 
+        # !Join [ "", [ "arn:aws:sns:us-east-1:868454036435:", !Ref MySNSTopic ] ]
+        Principal: sns.amazonaws.com
 
 
 
