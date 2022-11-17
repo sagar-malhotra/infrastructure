@@ -370,13 +370,9 @@ Resources:
           - Effect: "Allow"
             Action:
               - "s3:PutObject"
-              - "s3:GetObjectAcl"
               - "s3:GetObject"
-              - "s3:DeleteObjectVersion"
               - "s3:ListBucket"
               - "s3:DeleteObject"
-              - "s3:GetBucketLocation"
-              - "s3:PutObjectAcl"
             Resource: 
               - !Join [ "", [ "arn:aws:s3:::", !Ref S3Bucket,"/*" ] ]
               - !Join [ "", [ "arn:aws:s3:::", !Ref S3Bucket ] ]
@@ -392,6 +388,16 @@ Resources:
               - "logs:CreateLogGroup"
             Resource: 
               - "*"
+          - Effect: "Allow"
+            Action:
+              - "dynamodb:PutItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:GetItem"
+              - "dynamodb:Scan"
+              - "dynamodb:Query"
+              - "dynamodb:UpdateItem"
+            Resource: 
+              - !GetAtt DynamoDBTable.Arn
 
   
   EC2CSYE6225:
@@ -428,7 +434,104 @@ Resources:
       TTL: '900'
       ResourceRecords:
       - !GetAtt EC2Instance.PublicIp
-      
+
+  MySNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - "MyLambdaFunction"
+              - "Arn"
+          Protocol: "lambda"
+      TopicName: "CSYETopic"
+
+  SESLambda:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+            Resource: 
+              - "arn:aws:ses:us-east-1:868454036435:identity/prod.sagarmalhotra.me"
+          - Effect: "Allow"
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: 
+              - "arn:aws:ses:us-east-1:*:*"
+          - Effect: "Allow"
+            Action:
+              - "dynamodb:PutItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:GetItem"
+              - "dynamodb:Scan"
+              - "dynamodb:Query"
+              - "dynamodb:UpdateItem"
+            Resource: 
+              - !GetAtt DynamoDBTable.Arn
+          - Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+            Resource: 
+              - "arn:aws:s3:::lbsagar"
+  SESRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        - !Ref SESLambda
+      RoleName: !Join [ "_", ["SESRole", !Ref AWS::StackName ] ]
+
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyLambdaFunction
+      Role: !GetAtt SESRole.Arn
+      Runtime: python3.8
+      Handler: index.my_handler
+      Code:
+        S3Bucket: "lbsagar"
+        S3Key: "lambda_function.zip"
+  
+  DynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "Email"
+            AttributeType: "S"
+          -
+            AttributeName: "Token"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "Email"
+            KeyType: "HASH"
+          -
+            AttributeName: "Token"
+            KeyType: "RANGE"
+        ProvisionedThroughput:
+          ReadCapacityUnits: "1"
+          WriteCapacityUnits: "1"
+        TableName: "UserDetails"
+        TimeToLiveSpecification:
+          AttributeName: "TTL"
+          Enabled: "True"
+
 
 
 
