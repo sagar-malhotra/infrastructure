@@ -25,6 +25,8 @@ aws cloudformation create-stack --stack-name assignment6 --template-body file://
   
 aws cloudformation delete-stack --stack-name (name of the stack you want to delete) --profile (Profile you want to delete stack with) --region (region name)
   
+# command to add ssl certificate to AWS
+aws acm import-certificate --certificate fileb://certificate.pem --certificate-chain fileb://ca_bundle.pem --private-key fileb://private.key --profile demo
 
 
 

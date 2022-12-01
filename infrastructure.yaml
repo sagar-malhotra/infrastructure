@@ -164,57 +164,64 @@ Resources:
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: 
-          Fn::GetAtt:
-          - LoadBalancerSG
-          - GroupId
+            Fn::GetAtt:
+            - LoadBalancerSG
+            - GroupId
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           SourceSecurityGroupId: 
-          Fn::GetAtt:
-          - LoadBalancerSG
-          - GroupId
+            Fn::GetAtt:
+            - LoadBalancerSG
+            - GroupId
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
           SourceSecurityGroupId: 
-          Fn::GetAtt:
-          - LoadBalancerSG
-          - GroupId
+            Fn::GetAtt:
+            - LoadBalancerSG
+            - GroupId
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          SourceSecurityGroupId: 
+            Fn::GetAtt:
+            - LoadBalancerSG
+            - GroupId
       Tags:
             - Key: Name
               Value: !Join [ "_", [ "SecurityGroup", !Ref AWS::StackName ] ]
       VpcId: !Ref VPC
   
-  EC2Instance:
-    Type: AWS::EC2::Instance
-    Properties: 
-      ImageId:  !Ref amiId
-      InstanceType: t2.micro
-      SecurityGroupIds: 
-      - !Ref SecurityGroup
-      BlockDeviceMappings:
-      -
-        DeviceName: /dev/sda1 
-        Ebs:
-            DeleteOnTermination: true
-            VolumeSize: 50
-            VolumeType: gp2
-      SubnetId: !Ref Subnet1
-      Tags:
-            - Key: Name
-              Value: !Join [ "_", [ "EC2", !Ref AWS::StackName ] ]
-      UserData:
-        Fn::Base64: 
-          !Sub |
-            #!/bin/bash
-            yum update -y
-            sudo echo "DB_Name=\"csye6225\"" >> /home/ubuntu/.env
-            sudo echo "DB_User=\"csye6225\"" >> /home/ubuntu/.env
-            sudo echo "DB_Pass=\"sagar2212db\"" >> /home/ubuntu/.env
-            sudo echo "S3_Name=${S3Bucket}" >> /home/ubuntu/.env
-            sudo echo "DB_host=${DatabaseMysql.Endpoint.Address}" >> /home/ubuntu/.env
-      IamInstanceProfile: !Ref Ec2InstanceProfile
+  # EC2Instance:
+  #   Type: AWS::EC2::Instance
+  #   Properties: 
+  #     ImageId:  !Ref amiId
+  #     InstanceType: t2.micro
+  #     SecurityGroupIds: 
+  #     - !Ref SecurityGroup
+  #     BlockDeviceMappings:
+  #     -
+  #       DeviceName: /dev/sda1 
+  #       Ebs:
+  #           DeleteOnTermination: true
+  #           VolumeSize: 50
+  #           VolumeType: gp2
+  #     SubnetId: !Ref Subnet1
+  #     Tags:
+  #           - Key: Name
+  #             Value: !Join [ "_", [ "EC2", !Ref AWS::StackName ] ]
+  #     UserData:
+  #       Fn::Base64: 
+  #         !Sub |
+  #           #!/bin/bash
+  #           yum update -y
+  #           sudo echo "DB_Name=\"csye6225\"" >> /home/ubuntu/.env
+  #           sudo echo "DB_User=\"csye6225\"" >> /home/ubuntu/.env
+  #           sudo echo "DB_Pass=\"sagar2212db\"" >> /home/ubuntu/.env
+  #           sudo echo "S3_Name=${S3Bucket}" >> /home/ubuntu/.env
+  #           sudo echo "DB_host=${DatabaseMysql.Endpoint.Address}" >> /home/ubuntu/.env
+  #     IamInstanceProfile: !Ref Ec2InstanceProfile
 # Private route table ---------------
   myPrivateRouteTable:
     Type: AWS::EC2::RouteTable
@@ -333,6 +340,8 @@ Resources:
       MasterUserPassword: 'sagar2212db'
       DBParameterGroupName: !Ref RDSDBParameterGroup
       DBSubnetGroupName: !Ref DbSubnetGroup
+      StorageEncrypted: True
+      KmsKeyId: ccb0e497-87f8-4918-9145-3c6c691c1009
       PubliclyAccessible: False
       
   DbSubnetGroup:
@@ -410,17 +419,7 @@ Resources:
       Path: "/"
       Roles: 
        - !Ref EC2CSYE6225
-  
-  DnsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneName: !Ref HostedZoneName
-      Comment: DNS name for my instance.
-      Name: !Ref HostedZoneName
-      Type: A
-      TTL: '900'
-      ResourceRecords:
-      - !GetAtt EC2Instance.PublicIp
+
 
   MySNSTopic:
     Type: AWS::SNS::Topic
@@ -503,7 +502,7 @@ Resources:
       Properties:
         Action: lambda:InvokeFunction
         FunctionName: !GetAtt MyLambdaFnc.Arn
-        SourceArn: arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment9
+        SourceArn: arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment8
         Principal: sns.amazonaws.com
   
   LoadBalancerSG:
@@ -519,50 +518,217 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3306  
-          ToPort: 3306
-          CidrIp: 0.0.0.0/0
       Tags:
             - Key: Name
               Value: !Join [ "_", [ "LoadBalancerSG", !Ref AWS::StackName ] ]
       VpcId: !Ref VPC
 
-   AutoScalingGroup:
+  AsgConfig:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${AWS::StackName}-launch-template'
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - Ec2InstanceProfile
+            - Arn
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: 20
+              VolumeType: "gp2"
+              DeleteOnTermination: true
+              Encrypted: True
+              KmsKeyId: f042da0d-cb1f-4d81-8958-9cf495ad6a62
+        ImageId: !Ref amiId
+        # KeyName: MyKey
+        InstanceType: t2.micro
+        SecurityGroupIds: 
+          - !Ref SecurityGroup
+        UserData:
+          Fn::Base64: 
+            !Sub |
+              #!/bin/bash
+              yum update -y
+              sudo echo "DB_Name=\"csye6225\"" >> /home/ubuntu/.env
+              sudo echo "DB_User=\"csye6225\"" >> /home/ubuntu/.env
+              sudo echo "DB_Pass=\"sagar2212db\"" >> /home/ubuntu/.env
+              sudo echo "S3_Name=${S3Bucket}" >> /home/ubuntu/.env
+              sudo echo "DB_host=${DatabaseMysql.Endpoint.Address}" >> /home/ubuntu/.env
+        
+
+
+  AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-asg
+      AvailabilityZones:
+        - us-east-1a
+        - us-east-1b
+        - us-east-1c
+      Cooldown: '300'
       MinSize: '1'
       MaxSize: '3'
       DesiredCapacity: '1'
+      HealthCheckGracePeriod: 300
+      HealthCheckType: EC2
       LaunchTemplate:
-        LaunchTemplateId: !Ref EC2Instance
-        Version: !GetAtt EC2Instance.LatestVersionNumber
+        LaunchTemplateId: !Ref AsgConfig
+        Version: !GetAtt AsgConfig.LatestVersionNumber
+      NewInstancesProtectedFromScaleIn: False
       VPCZoneIdentifier:
         - !Ref Subnet1
         - !Ref Subnet2
         - !Ref Subnet3
       TargetGroupARNs:
-        - !Ref LoadBalancerSG
-      CoolDown: 60
+        - !Ref LBTargetGroup
       Tags:
-            - Key: Name
-              Value: !Join [ "_", [ "AutoScalingGroup", !Ref AWS::StackName ] ]
-              PropagationAtLaunch: "true"
-   myALBRequestCountPolicy:
+        - Key: Application
+          Value: WebApp
+          PropagateAtLaunch: "true"
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-asg
+          PropagateAtLaunch: "true"
+
+  ScaleUp:
     Type: AWS::AutoScaling::ScalingPolicy
-    DependsOn: myLoadBalancerListener
+    Properties: 
+      AdjustmentType: "ChangeInCapacity"
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: 60
+      ScalingAdjustment: 1
+
+  ScaleDown:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties: 
+      AdjustmentType: "ChangeInCapacity"
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: 60
+      ScalingAdjustment: -1
+
+  CPUHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      ActionsEnabled: True
+      AlarmActions: 
+        - !Ref ScaleUp
+      AlarmDescription: "Alarm when average CPU usage is above 5%"
+      ComparisonOperator: "GreaterThanThreshold"
+      Dimensions: 
+        -  Name: "AutoScalingGroupName"
+           Value: !Ref AutoScalingGroup
+      EvaluationPeriods: 1
+      MetricName: "CPUUtilization"
+      Namespace: "AWS/EC2"
+      Period: 300
+      Statistic: "Average"
+      Threshold: 3
+
+  CPULowAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      ActionsEnabled: True
+      AlarmActions: 
+        - !Ref ScaleDown
+      AlarmDescription: "Alarm when average CPU usage is below 3%"
+      ComparisonOperator: "LessThanThreshold"
+      Dimensions: 
+        -  Name: "AutoScalingGroupName"
+           Value: !Ref AutoScalingGroup
+      EvaluationPeriods: 1
+      MetricName: "CPUUtilization"
+      Namespace: "AWS/EC2"
+      Period: 300
+      Statistic: "Average"
+      Threshold: 2
+
+  AppLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - Key: routing.http2.enabled
+          Value: true
+      Name: !Sub ${AWS::StackName}-load-balancer
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSG
+      Subnets: 
+        - !Ref Subnet1
+        - !Ref Subnet2
+        - !Ref Subnet3
+      Tags:
+        - Key: Application
+          Value: WebApp
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-load-balancer
+      Type: application
+
+  LBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      AutoScalingGroupName: !Ref myASG
-      PolicyType: TargetTrackingScaling
-      TargetTrackingConfiguration:
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ALBRequestCountPerTarget
-          ResourceLabel: !Join 
-            - '/' 
-            - - !GetAtt myLoadBalancer.LoadBalancerFullName
-              - !GetAtt myTargetGroup.TargetGroupFullName
-        TargetValue: !Ref ALBRequestCountTargetValue
+      DefaultActions: 
+        - Type : "forward"
+          TargetGroupArn : !Ref LBTargetGroup
+      LoadBalancerArn: !Ref AppLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates : 
+       - CertificateArn : "arn:aws:acm:us-east-1:868454036435:certificate/899d07b5-c82e-46fc-b36d-b3ad70cbcbc0"
+
+  LBTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: '/app'
+      HealthCheckPort: 5000
+      HealthCheckProtocol: 'HTTP'
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      IpAddressType: ipv4
+      Name: !Sub ${AWS::StackName}-lb-tg
+      Port: 5000
+      Protocol: 'HTTP'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lb-tg
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+  
+  LoadBalancerAlias:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt AppLoadBalancer.DNSName
+        HostedZoneId: !GetAtt AppLoadBalancer.CanonicalHostedZoneID
+      HostedZoneName: !Ref HostedZoneName
+      Name: !Ref HostedZoneName
+      Type: A
+
+
+
+
+
+
+    
+    
+
   
 
 
 
+    
+
+
+    
+
+  
+  
+    
+    
+   
