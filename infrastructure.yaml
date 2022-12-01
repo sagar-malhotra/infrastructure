@@ -163,23 +163,24 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: 
+          Fn::GetAtt:
+          - LoadBalancerSG
+          - GroupId
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 5000
-          ToPort: 5000
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: 
+          Fn::GetAtt:
+          - LoadBalancerSG
+          - GroupId
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: 
+          Fn::GetAtt:
+          - LoadBalancerSG
+          - GroupId
       Tags:
             - Key: Name
               Value: !Join [ "_", [ "SecurityGroup", !Ref AWS::StackName ] ]
@@ -441,11 +442,7 @@ Resources:
               - "ses:SendEmail"
             Resource: 
               - "arn:aws:ses:us-east-1:868454036435:identity/prod.sagarmalhotra.me"
-          - Effect: "Allow"
-            Action:
-              - "s3:GetObject"
-            Resource: 
-              - "arn:aws:s3:::lbsagar"
+
   SESRole:
     Type: AWS::IAM::Role
     Properties: 
@@ -470,15 +467,11 @@ Resources:
       Role: !GetAtt SESRole.Arn
       Runtime: python3.8
       Handler: lambda_function.lambda_handler
-      # Events:
-      #   SNS1:
-      #     Type: SNS
-      #     Properties:
-      #       Topic:
-      #         Ref: MySNSTopic
       Code:
-        S3Bucket: "lbsagar"
-        S3Key: "lambda_function.zip"
+        ZipFile: |
+          def lambda_handler(event, context):
+            # TODO implement
+            print("Dummy  Lambda Function")
   
   DynamoDBTable:
       Type: AWS::DynamoDB::Table
@@ -510,27 +503,66 @@ Resources:
       Properties:
         Action: lambda:InvokeFunction
         FunctionName: !GetAtt MyLambdaFnc.Arn
-        SourceArn: arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment8 
-        # !Join [ "", [ "arn:aws:sns:us-east-1:868454036435:", !Ref MySNSTopic ] ]
+        SourceArn: arn:aws:sns:us-east-1:868454036435:CSYETopic_assignment9
         Principal: sns.amazonaws.com
+  
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Security Group for load balancer"
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3306  
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+      Tags:
+            - Key: Name
+              Value: !Join [ "_", [ "LoadBalancerSG", !Ref AWS::StackName ] ]
+      VpcId: !Ref VPC
 
-
-
-
-    
-    
-
+   AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity: '1'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EC2Instance
+        Version: !GetAtt EC2Instance.LatestVersionNumber
+      VPCZoneIdentifier:
+        - !Ref Subnet1
+        - !Ref Subnet2
+        - !Ref Subnet3
+      TargetGroupARNs:
+        - !Ref LoadBalancerSG
+      CoolDown: 60
+      Tags:
+            - Key: Name
+              Value: !Join [ "_", [ "AutoScalingGroup", !Ref AWS::StackName ] ]
+              PropagationAtLaunch: "true"
+   myALBRequestCountPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    DependsOn: myLoadBalancerListener
+    Properties:
+      AutoScalingGroupName: !Ref myASG
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Join 
+            - '/' 
+            - - !GetAtt myLoadBalancer.LoadBalancerFullName
+              - !GetAtt myTargetGroup.TargetGroupFullName
+        TargetValue: !Ref ALBRequestCountTargetValue
   
 
 
 
-    
-
-
-    
-
-  
-  
-    
-    
-   
